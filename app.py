@@ -5,6 +5,7 @@ from json import loads
 
 app = Flask(__name__)
 app.config["JSON_SORT_KEYS"] = False
+app.config["DEBUG"] = True
 
 baseUrl = "https://in.bookmyshow.com"
 
@@ -27,8 +28,9 @@ def getNowShowing(city):
 	# 	event = "movies"
 	event = "Movies"
 	data = loads(request.data)
-	dimensions = data['dimensions']
-	languages = data['languages']
+	dimensions = data.get('dimensions')
+	languages = data.get('languages')
+
 	url = "https://in.bookmyshow.com/{city}/{event}".format(city=city.lower(), event=event.lower())
 	try:
 		bmsNowShowingContent = get(url)
@@ -46,21 +48,30 @@ def getNowShowing(city):
 				img = tag.find("img", {"class": "__poster __animated"})
 				movie = {
 					'name': img['alt'],
-					'booking_url': tag.find('a', recursive=True)['href'],
-					'image_url': img['data-src'],
+					'movieUrl': tag.find('a', recursive=True)['href'],
+					'imageUrl': img['data-src'],
 					'languages': tag['data-language-filter'][1:].split('|'),
 					'dimensions': tag['data-dimension-filter'][1:].split('|')
 				}
-				if len(dimensions) > 0:
+				if dimensions is not None:
 					if not any(dimen in movie['dimensions'] for dimen in dimensions):
 						continue
-				if len(languages) > 0:
+				if languages is not None:
 					if not any(lang in movie['languages'] for lang in languages):
 						continue
 				movieUrls[movie['name']] = movie
 			if len(movieUrls) <= 0:
 				raise Exception('Data not received from BookMyShow.com')
 			return jsonify(movieUrls)
+
+
+@app.route('/<city>/bookurls/')
+def getUrls(city):
+	requestData = loads(request.data)
+	movieUrl = requestData['movieUrl']
+	movieName = requestData['movieName']
+	dimensions = requestData['dimensions']
+	languages = requestData['languages']
 
 
 if __name__ == '__main__':

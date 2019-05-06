@@ -22,15 +22,15 @@ def pageNotFound(e):
 
 
 @app.route('/<city>/', methods=["GET", "POST"])
-def getNowShowing(city):
-	# event = request.form.get('event')
-	# if event is None:
-	# 	event = "movies"
+def sendNowShowing(city):
 	event = "Movies"
 	data = loads(request.data)
 	dimensions = data.get('dimensions')
 	languages = data.get('languages')
+	return jsonify(getNowShowing(city, event, languages, dimensions))
 
+
+def getNowShowing(city, event, languages=None, dimensions=None):
 	url = "https://in.bookmyshow.com/{city}/{event}".format(city=city.lower(), event=event.lower())
 	try:
 		bmsNowShowingContent = get(url)
@@ -38,7 +38,7 @@ def getNowShowing(city):
 		print('Exception Occurred: ', e)
 		return 'Could not reach BookMyShow.com'
 	else:
-		# print(bmsNowShowingContent.reason)
+		print(bmsNowShowingContent.reason)
 		if bmsNowShowingContent.status_code == 404:
 			abort(404, "City/Event not supported")
 		else:
@@ -62,7 +62,7 @@ def getNowShowing(city):
 				movieUrls[movie['name']] = movie
 			if len(movieUrls) <= 0:
 				raise Exception('Data not received from BookMyShow.com')
-			return jsonify(movieUrls)
+			return movieUrls
 
 
 def getVenueDataWithUrl(url):
@@ -75,13 +75,11 @@ def getVenueDataWithUrl(url):
 	venues = soup.find("ul", {"id": "venuelist"})
 	for venue in venues.find_all("li", {"class": "list"}):
 		venue_name = venue.find("a", {"class": "__venue-name"}).text.strip()
-		# print(venue_name)
 		current_venue = {
 			"name": venue_name,
 			"timings": []
 		}
 		for timings in venue.find_all("a", {"class": "__showtime-link"}):
-			# print(timings.text.strip(), timings['data-cat-popup'])
 			current_timing = {
 				"show_time": timings.text.strip()[:8],
 				"seat_type": []
@@ -96,7 +94,6 @@ def getVenueDataWithUrl(url):
 				current_timing['seat_type'].append(current_seat)
 			current_venue['timings'].append(current_timing)
 		venue_data.append(current_venue)
-	# self.writeToFile("details.json", {"details": venue_data})
 	return jsonify({"details": venue_data})
 
 
@@ -115,17 +112,13 @@ def getVenueDataWithLangAndDimenUrl(langDimUrl, language, dimension):
 		dimensions = langs.next_sibling.next_sibling
 		if lang_from_site == language:
 			for dimen in dimensions.find_all("a", {"class": "dimension-pill"}):
-				if dimen == dimension:
+				if dimen.text == dimension:
 					movieUrl = dimen['href']
 					break
-	# langAndDimen[language][dimen.text] = {
-	# 	"dimension": dimen.text,
-	# 	"url": dimen['href']
-	# }
 
 	if movieUrl is None:
 		return "Couldn't find the movie with given language and dimension."  # TODO: return with a proper json
-	return getVenueDataWithUrl(movieUrl)
+	return getVenueDataWithUrl(baseUrl + movieUrl)
 
 
 @app.route('/<city>/bookingurls/', methods=["GET", "POST"])
@@ -140,13 +133,23 @@ def getUrls(city):
 	language = requestData.get('language')
 	langDimUrl = requestData.get('langDimUrl')
 
+	if dimension is None:
+		return "Dimension not provided"
+	if language is None:
+		return "Language not provided"
+
 	if langDimUrl is not None:
 		return getVenueDataWithLangAndDimenUrl(langDimUrl, language, dimension)
+
 	# url = "https://in.bookmyshow.com/pune/movies/avengers-endgame/ET00090482"
 
-	# movieName = requestData.get('movieName')
-	# nowShowing = getNowShowing(city)
-
+	movieName = requestData.get('movieName')
+	if movieName is None:
+		return "Movie name not provided"
+	nowShowing = getNowShowing(city, "movies", [language], [dimension])
+	if movieName not in nowShowing:
+		return "Movie not found"
+	return getVenueDataWithLangAndDimenUrl(baseUrl + nowShowing[movieName]['movieUrl'], language, dimension)
 
 
 if __name__ == '__main__':

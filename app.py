@@ -121,8 +121,8 @@ def getVenueDataWithLangAndDimenUrl(langDimUrl, language, dimension):
 	return getVenueDataWithUrl(baseUrl + movieUrl)
 
 
-@app.route('/<city>/bookingurls/', methods=["GET", "POST"])
-def getUrls(city):
+@app.route('/<city>/venues/', methods=["GET", "POST"])
+def getVenuesData(city):
 	requestData = loads(request.data)
 	movieUrl = requestData.get('movieUrl')
 
@@ -141,14 +141,13 @@ def getUrls(city):
 	if langDimUrl is not None:
 		return getVenueDataWithLangAndDimenUrl(langDimUrl, language, dimension)
 
-	# url = "https://in.bookmyshow.com/pune/movies/avengers-endgame/ET00090482"
-
 	movieName = requestData.get('movieName')
 	if movieName is None:
 		return "Movie name not provided"
 	nowShowing = getNowShowing(city, "movies", [language], [dimension])
+	# print(nowShowing)
 	if movieName not in nowShowing:
-		return "Movie not found"
+		return jsonify({"available": nowShowing})
 	return getVenueDataWithLangAndDimenUrl(baseUrl + nowShowing[movieName]['movieUrl'], language, dimension)
 
 

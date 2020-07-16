@@ -1,5 +1,7 @@
 # BookMyShow API
 
+### This is not maintained now.
+
 This API is created with Flask. It scrapes data from bookmyshow.com and provides the necessary data. No need of some special key, just hit the api to get results. 
 *It is not live yet but will be soon.*
 

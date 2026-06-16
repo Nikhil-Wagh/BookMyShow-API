@@ -24,10 +24,15 @@ def pageNotFound(e):
 @app.route('/<city>/', methods=["GET", "POST"])
 def sendNowShowing(city):
 	event = "Movies"
-	data = loads(request.data)
+	data = request.get_json(force=True, silent=True)
+	if data is None:
+		return jsonify({"error": "Invalid or missing JSON body"}), 400
 	dimensions = data.get('dimensions')
 	languages = data.get('languages')
-	return jsonify(getNowShowing(city, event, languages, dimensions))
+	try:
+		return jsonify(getNowShowing(city, event, languages, dimensions))
+	except Exception as e:
+		return jsonify({"error": str(e)}), 500
 
 
 def getNowShowing(city, event, languages=None, dimensions=None):
@@ -67,7 +72,13 @@ def getNowShowing(city, event, languages=None, dimensions=None):
 
 def getVenueDataWithUrl(url):
 	print(url)
-	theatres_page_content = get(url)
+	try:
+		theatres_page_content = get(url)
+	except Exception as e:
+		print('Exception Occurred: ', e)
+		return jsonify({"error": "Could not reach BookMyShow.com"}), 500
+	if theatres_page_content.status_code != 200:
+		return jsonify({"error": "Received status {}".format(theatres_page_content.status_code)}), 502
 	soup = BeautifulSoup(theatres_page_content.text, 'html5lib')
 	print(soup.title.string)
 
@@ -109,7 +120,12 @@ def getVenueDataWithLangAndDimenUrl(langDimUrl, language, dimension):
 	tag = soup.find("div", {"id": "languageAndDimension"})
 	for langs in tag.find_all("div", {"class": "format-heading"}):
 		lang_from_site = langs.text.strip()
-		dimensions = langs.next_sibling.next_sibling
+		sibling = langs.next_sibling
+		if sibling is not None:
+			sibling = sibling.next_sibling
+		if sibling is None:
+			continue
+		dimensions = sibling
 		if lang_from_site == language:
 			for dimen in dimensions.find_all("a", {"class": "dimension-pill"}):
 				if dimen.text == dimension:
@@ -123,7 +139,9 @@ def getVenueDataWithLangAndDimenUrl(langDimUrl, language, dimension):
 
 @app.route('/<city>/venues/', methods=["GET", "POST"])
 def getVenuesData(city):
-	requestData = loads(request.data)
+	requestData = request.get_json(force=True, silent=True)
+	if requestData is None:
+		return jsonify({"error": "Invalid or missing JSON body"}), 400
 	movieUrl = requestData.get('movieUrl')
 
 	if movieUrl is not None:
@@ -144,7 +162,10 @@ def getVenuesData(city):
 	movieName = requestData.get('movieName')
 	if movieName is None:
 		return "Movie name not provided"
-	nowShowing = getNowShowing(city, "movies", [language], [dimension])
+	try:
+		nowShowing = getNowShowing(city, "movies", [language], [dimension])
+	except Exception as e:
+		return jsonify({"error": str(e)}), 500
 	# print(nowShowing)
 	if movieName not in nowShowing:
 		return jsonify({"available": nowShowing})
